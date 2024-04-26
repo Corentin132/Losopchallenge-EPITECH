@@ -1,0 +1,52 @@
+name: CD - Update image version and job name (main only)
+
+on:
+  release:
+    types:
+      - published
+    branches:
+      - main
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  update-image-version-and-job-label-version:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update image version
+        run: |
+          latest_release_version=${{ github.ref_name }}
+          latest_version=${latest_release_version#v}
+          deployment_file="k8s/RKE2/web-client/web-client-deployment.yaml"
+          job_file="k8s/RKE2/web-client/web-client-job.yaml"
+          sed -i "s|\(image: .*:\)[^[:space:]]*|\1${latest_version}|" $deployment_file
+          sed -i "s|\(image: .*:\)[^[:space:]]*|\1${latest_version}|" $job_file
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add $deployment_file
+          git add $job_file
+          git commit -m "Update image version to ${latest_version}"
+
+      - name: Update job name
+        run: |
+          file="k8s/RKE2/web-client/web-client-job.yaml"
+          current_datetime=$(date -u +"%Y%m%dT%H%M%SZ" | tr '[:upper:]' '[:lower:]')
+          sed -i "s/web-client-migration-job-[0-9]\{8\}t[0-9]\{6\}z/web-client-migration-job-$current_datetime/" $file
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add $file
+          git commit -m "Update job name to web-client-migration-job-${current_datetime}"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: 'main'

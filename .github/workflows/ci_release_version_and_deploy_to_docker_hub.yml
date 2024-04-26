@@ -1,0 +1,68 @@
+name: CI - Release version and deploy to Docker Hub (main only)
+
+on:
+  workflow_run:
+    branches:
+      - main
+    workflows:
+      - "CI - Build, test and scan"
+    types:
+      - completed
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  release-version:
+    name: Release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.run_semantic_release.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run semantic-release
+        id: run_semantic_release
+        run: |
+          output=$(cd web-client && npx semantic-release --branches main)
+          echo $output
+          version=$(echo $output | grep -oP 'Published release \K.*?(?= )' || true)
+          if [[ -z $version || $version =~ ^[[:space:]]*$ ]]; then
+            echo "version=NONE" >> $GITHUB_OUTPUT
+          else
+            echo "version=$version" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+
+  deploy-to-docker-hub:
+    name: Deploy to Docker Hub
+    runs-on: ubuntu-latest
+    needs: release-version
+    if: needs.release-version.outputs.version != 'NONE'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: web-client
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/t-nsa-800:${{ needs.release-version.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/t-nsa-800:latest

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.27.0
+        args:
+          - "--config.file=/etc/alertmanager/config.yml"
+          - "--storage.path=/alertmanager"
+        env:
+        - name: DISCORD_WEBHOOK
+          value: 'https://discord.com/api/webhooks/1224657218205646928/GqFdpYz7s3ZarB23-TXWxBuMJDYkKxj9u__0kFb8q-Ea2kydeJEtH2ilGqRafo6uQspK'
+        - name: DISCORD_USERNAME
+          value: "AlarmManager"
+        ports:
+        - name: alertmanager
+          containerPort: 9093
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+
+        volumeMounts:
+        - name: alertmanager-config
+          mountPath: /etc/alertmanager
+        - name: alertmanager-templates
+          mountPath: /etc/alertmanager-templates
+        - name: alertmanager-storage
+          mountPath: /alertmanager
+      volumes:
+      - name: alertmanager-config
+        configMap:
+          name: alertmanager-config
+      - name: alertmanager-templates
+        configMap:
+          name: alertmanager-templates
+      - name: alertmanager-storage
+        persistentVolumeClaim:
+          claimName: alertmanager-pvc

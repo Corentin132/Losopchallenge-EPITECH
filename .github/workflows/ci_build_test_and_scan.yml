@@ -1,0 +1,57 @@
+name: CI - Build, test and scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  build-test-and-scan:
+    name: Build, test and scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start containers
+        env:
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
+        run: |
+          docker-compose -f web-client/docker-compose.yaml up -d
+          sleep 10
+          container_id=$(docker-compose -f web-client/docker-compose.yaml ps -q app)
+          echo "CONTAINER_ID=$container_id" >> $GITHUB_ENV
+          echo "IMAGE_NAME=$(docker inspect -f '{{.Config.Image}}' $container_id)" >> $GITHUB_ENV
+
+      - name: Run migrations
+        run: docker exec $CONTAINER_ID php artisan migrate --force
+
+      - name: Run tests
+        run: docker exec -t $CONTAINER_ID php artisan test
+
+      - name: Run Trivy image vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.IMAGE_NAME }}"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          format: "sarif"
+          output: "trivy-image-results-${{ github.sha }}.sarif"
+
+      #      - name: Push Trivy image scan results to Prometheus
+
+      - name: Run Trivy IaC vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "config"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          format: "sarif"
+          output: "trivy-iac-results-${{ github.sha }}.sarif"
+#      - name: Push Trivy IaC scan results to Prometheus

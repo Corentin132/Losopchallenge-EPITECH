@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  config.yml: |-
+    global:
+
+    templates:
+    - '/etc/alertmanager-templates/*.tmpl'
+
+    route:
+      group_by: ['alertname', 'job']
+      group_wait: 20s
+      group_interval: 5m
+      repeat_interval: 3h 
+      receiver: discord_webhook
+
+    receivers:
+    - name: 'discord_webhook'
+      discord_configs:
+      - webhook_url: 'https://discord.com/api/webhooks/1224657218205646928/GqFdpYz7s3ZarB23-TXWxBuMJDYkKxj9u__0kFb8q-Ea2kydeJEtH2ilGqRafo6uQspK'

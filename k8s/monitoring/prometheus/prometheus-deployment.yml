@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-dep
+  namespace: monitoring
+  labels:
+    app: prometheus-dep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-dep
+
+  template:
+    metadata:
+      name: prometheus-main
+      labels:
+        app: prometheus-dep
+    spec:
+      serviceAccountName: prometheus-k8s
+      containers:
+        - image: prom/prometheus:v2.50.0
+          name: prometheus
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.retention.time=12h"
+            - "--storage.tsdb.path=/prometheus/"
+            # - "--web.enable-lifecycle"
+            # - "--web.alertmanagers.url=http://alertmanager:9093/"
+          ports:
+            - name: webui
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 500m
+              memory: 500M
+            limits:
+              cpu: 1000m
+              memory: 1000M
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus/
+            - name: rules-volume
+              mountPath: /etc/prometheus-rules/
+      # restartPolicy: Always        # à verif
+      # securityContext: {}
+      # terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-config
+            items:
+              - key: prometheus.yml
+                path: prometheus.yml
+        - name: rules-volume
+          configMap:
+            name: prometheus-rules

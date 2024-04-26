@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-client-ingress
+spec:
+  tls:
+    - hosts:
+        - lostoptchallenge.com
+      secretName: ingress-tls
+  rules:
+    - host: lostoptchallenge.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-client-service
+                port:
+                  number: 80
+# générer le certificat avant : openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=ingress-demo.example.com"
+# ajouter en secret : kubectl create secret tls ingress-demo-tls --key tls.key --cert tls.crt
+

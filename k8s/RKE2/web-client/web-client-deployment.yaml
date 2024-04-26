@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-client-deployment
+  labels:
+    tier: laravel-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-client
+      tier: laravel-app
+  template:
+    metadata:
+      labels:
+        app: web-client
+        tier: laravel-app
+    spec:
+      containers:
+        - name: web-client
+          image: pokesrater/t-nsa-800:1.13.0
+          envFrom:
+            - configMapRef:
+                name: web-client
+            - secretRef:
+                name: web-client
+          ports:
+            - containerPort: 80
